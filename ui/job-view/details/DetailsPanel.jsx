@@ -13,12 +13,12 @@ import {
 } from '../../helpers/url';
 import { formatArtifacts } from '../../helpers/display';
 import { getData } from '../../helpers/http';
+import { getProjectJobUrl } from '../../helpers/location';
 import BugJobMapModel from '../../models/bugJobMap';
 import BugSuggestionsModel from '../../models/bugSuggestions';
 import JobClassificationModel from '../../models/classification';
 import JobModel from '../../models/job';
 import JobLogUrlModel from '../../models/jobLogUrl';
-import TextLogStepModel from '../../models/textLogStep';
 import PerfSeriesModel from '../../models/perfSeries';
 
 import PinBoard from './PinBoard';
@@ -107,7 +107,7 @@ class DetailsPanel extends React.Component {
     if (!selectedJob) {
       return;
     }
-    BugSuggestionsModel.get(selectedJob.id).then((suggestions) => {
+    BugSuggestionsModel.get(selectedJob.id).then(async (suggestions) => {
       suggestions.forEach((suggestion) => {
         suggestion.bugs.too_many_open_recent =
           suggestion.bugs.open_recent.length > thBugSuggestionLimit;
@@ -128,20 +128,38 @@ class DetailsPanel extends React.Component {
       // the log (we can do this asynchronously, it should normally be
       // fast)
       if (!suggestions.length) {
-        TextLogStepModel.get(selectedJob.id).then((textLogSteps) => {
-          const errors = textLogSteps
-            .filter((step) => step.result !== 'success')
-            .map((step) => ({
-              name: step.name,
-              result: step.result,
-              logViewerUrl: getLogViewerUrl(
-                selectedJob.id,
-                currentRepo.name,
-                step.finished_line_number,
-              ),
-            }));
+        const { data, failureStatus } = await getData(
+          getProjectJobUrl('/text_log_errors/', selectedJob.id),
+        );
+
+        if (!failureStatus && data.length) {
+          const errors = data.map((error) => ({
+            line: error.line,
+            line_number: error.line_number,
+            logViewerUrl: getLogViewerUrl(
+              selectedJob.id,
+              currentRepo.name,
+              error.line_number,
+            ),
+          }));
+
           this.setState({ errors });
-        });
+        }
+        // TextLogStepModel.get(selectedJob.id).then((textLogSteps) => {
+        //   console.log(textLogSteps)
+        //   const errors = textLogSteps
+        //     .filter((step) => step.result !== 'success')
+        //     .map((step) => ({
+        //       name: step.name,
+        //       result: step.result,
+        //       logViewerUrl: getLogViewerUrl(
+        //         selectedJob.id,
+        //         currentRepo.name,
+        //         step.finished_line_number,
+        //       ),
+        //     }));
+
+        // });
       }
 
       this.setState({ bugSuggestionsLoading: false, suggestions });
