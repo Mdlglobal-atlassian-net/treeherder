@@ -3,14 +3,23 @@ import { hot } from 'react-hot-loader/root';
 import { LazyLog } from 'react-lazylog';
 import isEqual from 'lodash/isEqual';
 
-import { getAllUrlParams, getUrlParam, setUrlParam } from '../helpers/location';
+import {
+  getAllUrlParams,
+  getUrlParam,
+  setUrlParam,
+  getProjectJobUrl,
+} from '../helpers/location';
 import { scrollToLine } from '../helpers/utils';
 import { isReftest } from '../helpers/job';
-import { getJobsUrl, getReftestUrl, getArtifactsUrl } from '../helpers/url';
+import {
+  getJobsUrl,
+  getReftestUrl,
+  getArtifactsUrl,
+  textLogErrorsEndpoint,
+} from '../helpers/url';
 import { getData } from '../helpers/http';
 import JobModel from '../models/job';
 import PushModel from '../models/push';
-import TextLogStepModel from '../models/textLogStep';
 import JobDetails from '../shared/JobDetails';
 import JobInfo from '../shared/JobInfo';
 import RepositoryModel from '../models/repository';
@@ -60,7 +69,7 @@ class App extends React.PureComponent {
     };
   }
 
-  componentDidMount() {
+  async componentDidMount() {
     const { repoName, jobId } = this.state;
 
     const repoPromise = RepositoryModel.getList();
@@ -72,7 +81,10 @@ class App extends React.PureComponent {
 
         // set the title of  the browser window/tab
         document.title = job.searchStr;
-        const rawLogUrl = job.logs && job.logs.length ? job.logs[0].url : null;
+        const rawLogUrl =
+          job.logs && job.logs.length
+            ? job.logs.find((log) => log.name === 'live_backing_log').url
+            : null;
         // other properties, in order of appearance
         // Test to disable successful steps checkbox on taskcluster jobs
         // Test to expose the reftest button in the logviewer actionbar
@@ -152,9 +164,12 @@ class App extends React.PureComponent {
         });
       });
 
-    TextLogStepModel.get(jobId).then((textLogSteps) => {
-      const stepErrors = textLogSteps.length ? textLogSteps[0].errors : [];
-      const errors = stepErrors.map((error) => ({
+    const { data, failureStatus } = await getData(
+      getProjectJobUrl(textLogErrorsEndpoint, jobId),
+    );
+
+    if (!failureStatus && data.length) {
+      const errors = data.map((error) => ({
         line: error.line,
         lineNumber: error.line_number + 1,
       }));
@@ -167,7 +182,7 @@ class App extends React.PureComponent {
       errorLinesCss(errors);
       this.setState({ errors });
       this.setSelectedLine(highlight, true);
-    });
+    }
   }
 
   onHighlight = (range) => {

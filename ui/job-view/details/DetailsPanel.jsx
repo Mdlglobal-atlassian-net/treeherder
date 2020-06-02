@@ -10,6 +10,7 @@ import {
   getLogViewerUrl,
   getReftestUrl,
   getArtifactsUrl,
+  textLogErrorsEndpoint,
 } from '../../helpers/url';
 import { formatArtifacts } from '../../helpers/display';
 import { getData } from '../../helpers/http';
@@ -129,7 +130,7 @@ class DetailsPanel extends React.Component {
       // fast)
       if (!suggestions.length) {
         const { data, failureStatus } = await getData(
-          getProjectJobUrl('/text_log_errors/', selectedJob.id),
+          getProjectJobUrl(textLogErrorsEndpoint, selectedJob.id),
         );
 
         if (!failureStatus && data.length) {
